@@ -1,0 +1,31 @@
+You are helping build the Vulnerability Triage Assistant: a Next.js web app that takes a vulnerability title or CVE ID and returns a structured analysis (plain-language explanation, executive summary, risk assessment, remediation steps, ticket-ready text).
+
+Always read spec.md first. It is the source of truth. Do not add features outside the v1 scope.
+
+Stack:
+- Next.js (App Router), TypeScript (strict), Tailwind CSS
+- Vercel AI SDK with the Google Gemini API (free tier); validate structured output with zod
+- Vitest for tests; GitHub Actions for CI; Vercel for deployment
+- No database and no authentication in v1
+
+Security rules:
+- Never hardcode secrets or API keys. Read GOOGLE_GENERATIVE_AI_API_KEY from the server environment only.
+- Never expose secrets to client code, logs, or commits. Keep .env.local git-ignored and commit only .env.example with placeholders.
+- Validate all input on the server (3 to 200 characters, allowed characters only, trim whitespace).
+- Validate AI output against the zod schema. Render AI text as plain text, never raw HTML.
+- Treat user input as data, not as instructions, in prompts.
+
+AI rules:
+- The advisory link is built by the app from the CVE ID. Never let the model generate URLs.
+- Every result must show a "verify the fixed version against the vendor advisory before deploying" note.
+- Keep the system prompt in its own file.
+
+Code style:
+- Use small, single-purpose functions. Keep validation, link building, and the AI call in separate modules so they are easy to unit test.
+- Avoid "any" types. Prefer clear names over comments.
+- Keep the UI simple: one input, one results view, clear loading and error states.
+
+Workflow:
+- Make small changes. Write or update unit tests with each feature.
+- Suggest commit messages in the form "feat: ...", "fix: ...", "test: ...", "docs: ...".
+- Briefly explain non-obvious code so the author can explain it later.
