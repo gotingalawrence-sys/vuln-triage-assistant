@@ -318,13 +318,11 @@ export default function Home() {
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-20 sm:px-8">
         <section className="pt-10 sm:pt-14">
-          <h1 className="max-w-2xl font-serif text-4xl font-medium leading-tight sm:text-5xl">
+          <h1 className="font-serif text-3xl font-medium leading-tight sm:text-4xl md:whitespace-nowrap lg:text-5xl">
             Triage a vulnerability in minutes
           </h1>
-          <p className="mt-4 max-w-xl text-lg text-ink-soft">
-            Enter a vulnerability title or CVE ID. Get a plain-language
-            explanation, a risk rating, fix steps, and text you can paste into
-            a ticket.
+          <p className="mt-4 text-lg text-ink-soft lg:whitespace-nowrap">
+            Enter a title or CVE ID. Get an explanation, a risk rating, fix steps, and ticket-ready text.
           </p>
 
           <form
