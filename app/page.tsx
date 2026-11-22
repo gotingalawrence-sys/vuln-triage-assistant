@@ -1,42 +1,257 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import {
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import type { TriageResult } from "../lib/schema";
 import type { AdvisoryLink } from "../lib/advisory";
 
+type Severity = TriageResult["riskAssessment"]["severity"];
 type ApiSuccess = { result: TriageResult; advisory: AdvisoryLink };
 
-const SEVERITY_STYLES: Record<TriageResult["riskAssessment"]["severity"], string> = {
-  Low: "bg-green-100 text-green-800",
-  Medium: "bg-yellow-100 text-yellow-800",
-  High: "bg-orange-100 text-orange-800",
-  Critical: "bg-red-100 text-red-800",
-  Unknown: "bg-gray-200 text-gray-800",
+const SCALE = ["Low", "Medium", "High", "Critical"] as const;
+const SEGMENT_FILL = [
+  "bg-sev-low",
+  "bg-sev-medium",
+  "bg-sev-high",
+  "bg-sev-critical",
+];
+const SEVERITY_TEXT: Record<Severity, string> = {
+  Low: "text-sev-low",
+  Medium: "text-sev-medium",
+  High: "text-sev-high",
+  Critical: "text-sev-critical",
+  Unknown: "text-sev-unknown",
 };
+const EXAMPLES = [
+  "Microsoft Windows Security Update for November 2026",
+  "CVE-2021-44228",
+  "Google Chrome Security Update",
+];
 
-function Card({ title, children }: { title: string; children: ReactNode }) {
+/* ---------- icons ---------- */
+
+function IconBase({ children }: { children: ReactNode }) {
   return (
-    <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <h2 className="mb-2 text-lg font-semibold">{title}</h2>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-[1em] w-[1em] shrink-0"
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-6 w-6"
+      aria-hidden="true"
+    >
+      <path d="M12 3l8 3v6c0 4.5-3.2 8.2-8 9-4.8-.8-8-4.5-8-9V6l8-3z" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <IconBase>
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V6a2 2 0 0 1 2-2h9" />
+    </IconBase>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <IconBase>
+      <path d="M5 12l4 4 10-10" />
+    </IconBase>
+  );
+}
+
+function InfoIcon() {
+  return (
+    <IconBase>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5M12 8h.01" />
+    </IconBase>
+  );
+}
+
+function ExternalIcon() {
+  return (
+    <IconBase>
+      <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+    </IconBase>
+  );
+}
+
+function SpinnerIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-4 w-4 animate-spin motion-reduce:animate-none"
+      aria-hidden="true"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+        stroke="currentColor"
+        strokeOpacity=".25"
+        strokeWidth="3"
+      />
+      <path
+        d="M21 12a9 9 0 0 0-9-9"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/* ---------- small components ---------- */
+
+function CopyButton({ text, idleLabel }: { text: string; idleLabel: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setState("copied");
+    } catch {
+      setState("failed");
+    }
+    setTimeout(() => setState("idle"), 2000);
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      className="inline-flex items-center gap-2 rounded-md border border-rule bg-white px-3 py-1.5 text-sm font-medium text-ink hover:border-cobalt hover:text-cobalt"
+    >
+      {state === "copied" ? <CheckIcon /> : <CopyIcon />}
+      <span aria-live="polite">
+        {state === "copied"
+          ? "Copied"
+          : state === "failed"
+            ? "Copy failed. Select the text instead."
+            : idleLabel}
+      </span>
+    </button>
+  );
+}
+
+function Section({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="border-t border-rule pt-5">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="font-serif text-xl font-medium">{title}</h2>
+        {action}
+      </div>
       {children}
     </section>
   );
 }
 
+function SeverityScale({ severity }: { severity: Severity }) {
+  const index = SCALE.findIndex((level) => level === severity);
+
+  return (
+    <div
+      role="img"
+      aria-label={
+        index >= 0 ? `Severity scale: ${severity}` : "Severity not rated"
+      }
+    >
+      <div className="flex gap-1.5">
+        {SCALE.map((level, i) => (
+          <div
+            key={level}
+            style={{ "--i": i } as CSSProperties}
+            className={`h-3 flex-1 rounded-sm ${
+              index >= i ? `${SEGMENT_FILL[i]} segment-in` : "bg-rule"
+            }`}
+          />
+        ))}
+      </div>
+      <div className="mt-2 flex gap-1.5 text-sm text-ink-soft">
+        {SCALE.map((level) => (
+          <span
+            key={level}
+            className={`flex-1 ${level === severity ? "font-semibold text-ink" : ""}`}
+          >
+            {level}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div aria-busy="true">
+      <p className="mb-4 text-ink-soft">
+        Analyzing. This usually takes a few seconds.
+      </p>
+      <div className="space-y-4 motion-safe:animate-pulse">
+        <div className="h-40 rounded-lg border border-rule bg-white" />
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="h-64 rounded-lg border border-rule bg-white" />
+          <div className="h-64 rounded-lg border border-rule bg-white" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- page ---------- */
+
 export default function Home() {
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
+  const [submittedTitle, setSubmittedTitle] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ApiSuccess | null>(null);
-  const [copied, setCopied] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setError(null);
     setData(null);
-    setCopied(false);
+    setSubmittedTitle(title.trim());
 
     try {
       const response = await fetch("/api/triage", {
@@ -51,145 +266,248 @@ export default function Home() {
         setData(json as ApiSuccess);
       }
     } catch {
-      setError("Could not reach the server. Check your connection and try again.");
+      setError(
+        "Could not reach the server. Check your connection and try again."
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  async function copyTicket() {
-    if (!data) return;
-    try {
-      await navigator.clipboard.writeText(data.result.ticketText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setError("Could not copy automatically. Select the text and copy it manually.");
-    }
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <main className="mx-auto max-w-3xl px-4 py-10">
-        <h1 className="text-3xl font-bold">Vulnerability Triage Assistant</h1>
-        <p className="mt-2 text-gray-600">
-          Enter a vulnerability title or CVE ID to get a plain-language explanation,
-          an executive summary, a risk assessment, remediation steps, and
-          ticket-ready text.
-        </p>
+    <div className="flex min-h-screen flex-col">
+      <header className="border-b border-rule bg-white">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-5 py-4 sm:px-8">
+          <span className="text-cobalt">
+            <ShieldIcon />
+          </span>
+          <p className="font-serif text-lg font-medium">
+            Vulnerability Triage Assistant
+          </p>
+        </div>
+      </header>
 
-        <p className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          Only submit public vulnerability titles or CVE IDs. Never enter internal
-          company or device data.
-        </p>
+      <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-20 sm:px-8">
+        <section className="pt-10 sm:pt-14">
+          <h1 className="max-w-2xl font-serif text-4xl font-medium leading-tight sm:text-5xl">
+            Triage a vulnerability in minutes
+          </h1>
+          <p className="mt-4 max-w-xl text-lg text-ink-soft">
+            Enter a vulnerability title or CVE ID. Get a plain-language
+            explanation, a risk rating, fix steps, and text you can paste into
+            a ticket.
+          </p>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div>
-            <label htmlFor="title" className="block text-sm font-medium">
+          <form
+            onSubmit={handleSubmit}
+            className="mt-8 rounded-lg border border-rule bg-white p-5 sm:p-6"
+          >
+            <label htmlFor="title" className="block font-medium">
               Vulnerability title or CVE ID
             </label>
             <input
               id="title"
+              ref={inputRef}
               type="text"
               required
               minLength={3}
               maxLength={200}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Microsoft Windows Security Update for November 2026"
-              className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2"
+              placeholder="Microsoft Windows Security Update for November 2026"
+              className="mt-2 h-12 w-full rounded-md border border-rule bg-white px-3 text-base placeholder:text-ink-soft/70"
             />
-          </div>
 
-          <div>
-            <label htmlFor="notes" className="block text-sm font-medium">
-              Extra notes (optional)
-            </label>
-            <textarea
-              id="notes"
-              rows={4}
-              maxLength={2000}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Paste scanner solution text, KB numbers, or version details"
-              className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2"
-            />
-          </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-sm text-ink-soft">Examples:</span>
+              {EXAMPLES.map((example) => (
+                <button
+                  key={example}
+                  type="button"
+                  onClick={() => {
+                    setTitle(example);
+                    inputRef.current?.focus();
+                  }}
+                  className="rounded-full border border-rule px-3 py-1 text-left text-sm hover:border-cobalt hover:text-cobalt"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded-md bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-          >
-            {loading ? "Analyzing..." : "Analyze"}
-          </button>
-        </form>
-
-        {error && (
-          <div
-            role="alert"
-            className="mt-6 rounded-md border border-red-300 bg-red-50 p-3 text-red-800"
-          >
-            {error}
-          </div>
-        )}
-
-        {data && (
-          <div className="mt-8 space-y-4">
-            <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-              Verify the fixed version against the vendor advisory before deploying.{" "}
-              <a
-                href={data.advisory.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-blue-700 underline"
+            <details className="mt-5">
+              <summary className="cursor-pointer text-sm font-medium text-cobalt hover:text-cobalt-deep">
+                Add scanner notes (optional)
+              </summary>
+              <label
+                htmlFor="notes"
+                className="mt-3 block text-sm text-ink-soft"
               >
-                {data.advisory.label}
-              </a>
-            </p>
-
-            <Card title="Explanation">
-              <p className="whitespace-pre-wrap">{data.result.explanation}</p>
-            </Card>
-
-            <Card title="Executive summary">
-              <p className="whitespace-pre-wrap">{data.result.executiveSummary}</p>
-            </Card>
-
-            <Card title="Risk assessment">
-              <span
-                className={`inline-block rounded-full px-3 py-1 text-sm font-medium ${SEVERITY_STYLES[data.result.riskAssessment.severity]}`}
-              >
-                {data.result.riskAssessment.severity}
-              </span>
-              <p className="mt-2 whitespace-pre-wrap">
-                {data.result.riskAssessment.rationale}
+                Paste solution text, KB numbers, or version details from your
+                scanner. The AI uses them for fix details.
+              </label>
+              <textarea
+                id="notes"
+                rows={4}
+                maxLength={2000}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="mt-2 w-full rounded-md border border-rule bg-white px-3 py-2 text-base"
+              />
+              <p className="mt-1 text-right text-xs text-ink-soft">
+                {notes.length}/2000
               </p>
-            </Card>
+            </details>
 
-            <Card title="Remediation steps">
-              <ol className="list-decimal space-y-1 pl-5">
-                {data.result.remediationSteps.map((step, index) => (
-                  <li key={index}>{step}</li>
-                ))}
-              </ol>
-            </Card>
-
-            <Card title="Ticket-ready text">
-              <pre className="whitespace-pre-wrap rounded-md bg-gray-100 p-3 font-sans text-sm">
-                {data.result.ticketText}
-              </pre>
+            <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
               <button
-                type="button"
-                onClick={copyTicket}
-                className="mt-3 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium hover:bg-gray-100"
+                type="submit"
+                disabled={loading}
+                className="inline-flex h-11 items-center gap-2 rounded-md bg-cobalt px-5 font-medium text-white hover:bg-cobalt-deep disabled:opacity-70"
               >
-                {copied ? "Copied!" : "Copy ticket text"}
+                {loading && <SpinnerIcon />}
+                {loading ? "Analyzing" : "Analyze vulnerability"}
               </button>
-            </Card>
-          </div>
-        )}
+              <p className="flex items-start gap-2 text-sm text-ink-soft">
+                <span className="mt-1">
+                  <InfoIcon />
+                </span>
+                <span>
+                  Public titles and CVE IDs only. Do not enter internal company
+                  or device data.
+                </span>
+              </p>
+            </div>
+          </form>
+        </section>
+
+        <div aria-live="polite" className="mt-10">
+          {loading && <LoadingSkeleton />}
+
+          {error && (
+            <div
+              role="alert"
+              className="rounded-lg border border-rule border-l-4 border-l-sev-critical bg-white p-4"
+            >
+              <p className="font-medium">Could not analyze this input</p>
+              <p className="mt-1 text-ink-soft">{error}</p>
+            </div>
+          )}
+
+          {data && (
+            <div>
+              <div className="rounded-lg border border-rule bg-white p-5 sm:p-7">
+                <h2 className="break-words font-serif text-2xl font-medium sm:text-3xl">
+                  {submittedTitle}
+                </h2>
+                <div className="mt-6 grid gap-6 md:grid-cols-[minmax(0,18rem)_1fr] md:items-start">
+                  <div>
+                    <p
+                      className={`font-serif text-4xl font-semibold ${SEVERITY_TEXT[data.result.riskAssessment.severity]}`}
+                    >
+                      {data.result.riskAssessment.severity === "Unknown"
+                        ? "Not rated"
+                        : data.result.riskAssessment.severity}
+                    </p>
+                    <div className="mt-3">
+                      <SeverityScale
+                        severity={data.result.riskAssessment.severity}
+                      />
+                    </div>
+                  </div>
+                  <p className="max-w-prose whitespace-pre-wrap">
+                    {data.result.riskAssessment.rationale}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
+                <div className="space-y-8">
+                  <Section title="What it is">
+                    <p className="max-w-prose whitespace-pre-wrap">
+                      {data.result.explanation}
+                    </p>
+                  </Section>
+
+                  <Section
+                    title="Executive summary"
+                    action={
+                      <CopyButton
+                        text={data.result.executiveSummary}
+                        idleLabel="Copy summary"
+                      />
+                    }
+                  >
+                    <p className="max-w-prose whitespace-pre-wrap">
+                      {data.result.executiveSummary}
+                    </p>
+                  </Section>
+
+                  <Section title="How to fix it">
+                    <ol className="space-y-3">
+                      {data.result.remediationSteps.map((step, index) => (
+                        <li key={index} className="flex gap-3">
+                          <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white">
+                            {index + 1}
+                          </span>
+                          <span className="max-w-prose">{step}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </Section>
+                </div>
+
+                <aside className="space-y-6">
+                  <div className="rounded-lg border border-rule border-l-4 border-l-sev-medium bg-white p-4">
+                    <h2 className="font-serif text-lg font-medium">
+                      Before you deploy
+                    </h2>
+                    <p className="mt-1 text-sm text-ink-soft">
+                      The AI can get fixed versions wrong. Check the version
+                      against the vendor advisory.
+                    </p>
+                    <a
+                      href={data.advisory.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-cobalt underline underline-offset-2 hover:text-cobalt-deep"
+                    >
+                      {data.advisory.label}
+                      <ExternalIcon />
+                      <span className="sr-only"> (opens in a new tab)</span>
+                    </a>
+                  </div>
+
+                  <div className="rounded-lg border border-rule bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <h2 className="font-serif text-lg font-medium">
+                        Ticket text
+                      </h2>
+                      <CopyButton
+                        text={data.result.ticketText}
+                        idleLabel="Copy ticket text"
+                      />
+                    </div>
+                    <p className="mt-1 text-sm text-ink-soft">
+                      Ready to paste into ServiceNow.
+                    </p>
+                    <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-fog p-3 font-sans text-sm leading-relaxed">
+                      {data.result.ticketText}
+                    </pre>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          )}
+        </div>
       </main>
+
+      <footer className="border-t border-rule bg-white">
+        <p className="mx-auto max-w-5xl px-5 py-4 text-sm text-ink-soft sm:px-8">
+          AI-generated analysis. Always verify fixed versions and severity
+          against the vendor advisory before you act.
+        </p>
+      </footer>
     </div>
   );
 }
