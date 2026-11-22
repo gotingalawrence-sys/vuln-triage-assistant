@@ -2,13 +2,17 @@ import { generateText, Output, NoObjectGeneratedError } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { triageResultSchema, type TriageResult } from "./schema";
 import { SYSTEM_PROMPT, buildUserPrompt } from "./prompt";
+import type { NvdFacts } from "./nvd";
 import type { ValidInput } from "./validation";
 
 export const DEFAULT_MODEL = "gemini-3.5-flash-lite";
 
 export class TriageError extends Error {}
 
-export async function runTriage(input: ValidInput): Promise<TriageResult> {
+export async function runTriage(
+  input: ValidInput,
+  facts: NvdFacts | null = null
+): Promise<TriageResult> {
   const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!apiKey) {
     throw new TriageError("The server is missing its AI API key.");
@@ -21,7 +25,7 @@ export async function runTriage(input: ValidInput): Promise<TriageResult> {
     const { output } = await generateText({
       model: google(modelName),
       system: SYSTEM_PROMPT,
-      prompt: buildUserPrompt(input),
+      prompt: buildUserPrompt(input, facts),
       output: Output.object({ schema: triageResultSchema }),
       temperature: 0.2,
     });

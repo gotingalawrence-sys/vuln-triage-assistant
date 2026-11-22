@@ -9,9 +9,14 @@ import {
 } from "react";
 import type { TriageResult } from "../lib/schema";
 import type { AdvisoryLink } from "../lib/advisory";
+import type { Grounding } from "../lib/nvd";
 
 type Severity = TriageResult["riskAssessment"]["severity"];
-type ApiSuccess = { result: TriageResult; advisory: AdvisoryLink };
+type ApiSuccess = {
+  result: TriageResult;
+  advisory: AdvisoryLink;
+  grounding: Grounding;
+};
 
 const SCALE = ["Low", "Medium", "High", "Critical"] as const;
 const SEGMENT_FILL = [
@@ -235,6 +240,30 @@ function LoadingSkeleton() {
   );
 }
 
+function severityLabel(severity: Severity, grounding: Grounding): string {
+  if (severity !== "Unknown") return severity;
+  if (grounding.lookup === "found") return "Not scored yet";
+  if (grounding.lookup === "skipped") return "Not rated";
+  return "Not verified";
+}
+
+function GroundingNote({ grounding }: { grounding: Grounding }) {
+  let text: string | null = null;
+
+  if (grounding.lookup === "found") {
+    text = grounding.cvss
+      ? `Source: NVD record, CVSS ${grounding.cvss.version} base score ${grounding.cvss.score}.`
+      : "Source: NVD record. NVD has not published a CVSS score for this CVE yet.";
+  } else if (grounding.lookup === "not_found") {
+    text = "NVD has no record for this CVE ID, so this analysis is not verified.";
+  } else if (grounding.lookup === "unavailable") {
+    text = "NVD could not be reached, so this analysis is not verified.";
+  }
+
+  if (!text) return null;
+  return <p className="mt-3 text-sm text-ink-soft">{text}</p>;
+}
+
 /* ---------- page ---------- */
 
 export default function Home() {
@@ -405,15 +434,17 @@ export default function Home() {
                     <p
                       className={`font-serif text-4xl font-semibold ${SEVERITY_TEXT[data.result.riskAssessment.severity]}`}
                     >
-                      {data.result.riskAssessment.severity === "Unknown"
-                        ? "Not rated"
-                        : data.result.riskAssessment.severity}
+                      {severityLabel(
+                        data.result.riskAssessment.severity,
+                        data.grounding
+                      )}
                     </p>
                     <div className="mt-3">
                       <SeverityScale
                         severity={data.result.riskAssessment.severity}
                       />
                     </div>
+                    <GroundingNote grounding={data.grounding} />
                   </div>
                   <p className="max-w-prose whitespace-pre-wrap">
                     {data.result.riskAssessment.rationale}

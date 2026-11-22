@@ -3,6 +3,12 @@ import { validateInput } from "../../../lib/validation";
 import { buildAdvisoryLink } from "../../../lib/advisory";
 import { runTriage, TriageError } from "../../../lib/triage";
 import { createRateLimiter } from "../../../lib/rateLimit";
+import {
+  applyNvdSeverity,
+  lookupCve,
+  type Grounding,
+  type NvdLookup,
+} from "../../../lib/nvd";
 
 const MAX_BODY_CHARS = 10_000;
 const isAllowed = createRateLimiter(10, 60_000);
@@ -41,9 +47,21 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await runTriage(validation.value);
+    // Only CVE IDs can be looked up in NVD. Titles like patch bundles skip this step.
+    const lookup: NvdLookup | null = validation.value.cveId
+      ? await lookupCve(validation.value.cveId)
+      : null;
+    const facts = lookup?.state === "found" ? lookup.facts : null;
+
+    const aiResult = await runTriage(validation.value, facts);
+    const result = applyNvdSeverity(aiResult, facts);
     const advisory = buildAdvisoryLink(validation.value);
-    return NextResponse.json({ result, advisory });
+    const grounding: Grounding = {
+      lookup: lookup?.state ?? "skipped",
+      cvss: facts?.cvss ?? null,
+    };
+
+    return NextResponse.json({ result, advisory, grounding });
   } catch (error) {
     const message =
       error instanceof TriageError
