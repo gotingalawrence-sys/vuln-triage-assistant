@@ -140,7 +140,7 @@ The same lint, test, and build steps run automatically on every push through Git
 - Saved history and user accounts
 - Tune remediation steps for enterprise deployment tools
 
-See the open GitHub issue for the planned v2 improvement: [ISSUE_LINK_HERE].
+See the open GitHub issue for the planned v2 improvement: (https://github.com/gotingalawrence-sys/vuln-triage-assistant/issues/1).
 
 ## Project documents
 
