@@ -1,36 +1,155 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Vulnerability Triage Assistant
 
-## Getting Started
+[![CI](https://github.com/gotingalawrence-sys/vuln-triage-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/gotingalawrence-sys/vuln-triage-assistant/actions/workflows/ci.yml)
 
-First, run the development server:
+An AI-powered web app that turns a vulnerability title or CVE ID into a structured, workflow-ready analysis in seconds: a plain-language explanation, an executive summary, a risk assessment, remediation steps, and text ready to paste into a ServiceNow ticket.
+
+- **Live app:** https://vuln-triage-assistant.vercel.app/
+- **2-minute demo:** [DEMO_LINK_HERE]
+- **Author:** Lawrence Godfrey Gotinga
+- **Context:** Week 4 Graded Assignment 4.2, AI-Powered Web Application
+
+## The problem
+
+Workstation vulnerability specialists receive scan exports with hundreds of findings. Scanners such as Qualys find and route vulnerabilities, but the specialist still has to research each one, understand it, and work out how to fix it by hand. In the author's own workflow that is roughly 20-30 unique vulnerability titles per week (about 100k findings) and about 30-60 minutes of triage per title (firsthand estimates).
+
+## Who it is for
+
+A workstation vulnerability specialist who needs to decide quickly what a vulnerability means and how to remediate it. Information security analysts and server remediation teams are secondary users.
+
+## What it does
+
+Enter a vulnerability title (for example, `Microsoft Windows Security Update for November 2026`) or a CVE ID (for example, `CVE-2021-44228`), optionally add notes such as scanner solution text or KB numbers, and get:
+
+1. **Explanation:** what the vulnerability or update is, in plain language
+2. **Executive summary:** 2-3 sentences on business impact for a non-technical reader
+3. **Risk assessment:** severity (Low, Medium, High, Critical, or Unknown) with a rationale
+4. **Remediation steps:** ordered, concrete actions
+5. **Ticket-ready text:** formatted for a ServiceNow ticket, with a copy button
+
+Every result also shows a **"verify before deploying"** note and an **advisory link built by the app** (never by the AI).
+
+### Success metric
+
+Reduce triage time per vulnerability title by at least 50% (from a 30-60 minute baseline).
+
+**Measured result:** about 3 minutes per vulnerability title with the tool, compared with the 30-60 minute manual baseline, which is roughly a 90-95% reduction. This is the author's own estimate from real use, not a controlled study.
+
+## How it works
+
+```
+Browser UI -> Next.js API route -> input validation -> Gemini (via Vercel AI SDK)
+          -> schema check (zod) -> advisory link builder -> result back to the UI
+```
+
+See [architecture.md](architecture.md) for components, the request lifecycle, trust boundaries, and design decisions.
+
+## Tech stack
+
+- Next.js (App Router), TypeScript, Tailwind CSS
+- Vercel AI SDK with the Google Gemini API (free tier)
+- zod for input and output schemas
+- Vitest for unit tests
+- GitHub Actions for CI; Vercel for hosting
+- Vercel Analytics and Vercel Logs for monitoring
+
+## Getting started
+
+### Prerequisites
+
+- A current LTS release of Node.js (CI runs on Node 24)
+- A free Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
+
+### Setup
+
+```bash
+git clone https://github.com/gotingalawrence-sys/vuln-triage-assistant.git
+cd vuln-triage-assistant
+npm install
+```
+
+Create a file named `.env.local` in the project root:
+
+```
+GOOGLE_GENERATIVE_AI_API_KEY=your_key_here
+
+# Optional: override the default Gemini model (default: gemini-3.5-flash-lite)
+# GEMINI_MODEL=
+```
+
+`.env.local` is git-ignored. Never commit a real key. `.env.example` shows the expected variables with placeholders only.
+
+### Run
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | What it does |
+|---|---|
+| `npm run dev` | Start the development server |
+| `npm run build` | Production build |
+| `npm run lint` | Lint the code |
+| `npm test` | Run the unit tests |
 
-## Learn More
+## Testing
 
-To learn more about Next.js, take a look at the following resources:
+26 unit tests (Vitest) cover:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Input validation (titles, CVE IDs, extra notes, control characters, length limits)
+- Advisory link building (CVE page, Microsoft Security Update Guide, search fallback)
+- Prompt building (including escaping to resist prompt injection through notes)
+- The output schema (valid results, missing sections, invalid severity, empty steps)
+- The rate limiter
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The same lint, test, and build steps run automatically on every push through GitHub Actions (`.github/workflows/ci.yml`).
 
-## Deploy on Vercel
+## Security and safeguards
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **No hardcoded secrets.** The API key is read from a server-side environment variable only. It is set in Vercel's dashboard for production and in `.env.local` for development. GitHub push protection also scans every push.
+- **Server-side input validation.** Titles are limited to 3-200 characters and an allowed character set. Notes are limited to 2000 characters. Request bodies over 10,000 characters are rejected.
+- **AI output is validated.** Responses must match the zod schema or the user sees a friendly error. AI text is rendered as plain text, never as HTML.
+- **Prompt-injection resistance.** User input is passed as data inside tags, angle brackets in notes are escaped, and the system prompt tells the model to ignore instructions found there.
+- **App-built advisory links.** The model never generates URLs, so links cannot be fabricated.
+- **Rate limiting.** 10 requests per minute per client on the API route (best effort, see limitations).
+- **Public data only.** The UI reminds users to submit public vulnerability titles only, because free AI tiers may use inputs to improve provider products.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## CI/CD, deployment, and monitoring
+
+- **CI:** GitHub Actions runs `npm ci`, lint, tests, and a production build on every push to `main` and on pull requests.
+- **Deployment:** Vercel is connected to this repository and deploys automatically on every push to `main`. The API key is stored as an environment variable in Vercel.
+- **Monitoring:** Vercel Analytics tracks page visits (not user input), and Vercel's Logs tab shows server-side errors from the API route.
+
+## Known limitations
+
+- **The AI can be wrong.** In particular it may state an incorrect fixed version, or lack knowledge of very recent patch releases. The app mitigates this with the verify-before-deploying note, an advisory link, an optional notes field, and the `Unknown` severity for bundles, but results must be checked against the vendor advisory.
+- **NVD search fallback is limited.** For titles without a CVE ID (other than Microsoft titles), the link is an NVD keyword search. NVD requires all keywords to match, so long titles may return nothing. NIST has also changed its search URLs before, so this link format may need updating.
+- **Rate limiting is in-memory.** On a serverless host each instance keeps its own counters, so the limit is best effort.
+- **Free-tier model limits.** The Gemini free tier has per-minute and per-day request limits, and model names change over time (see `GEMINI_MODEL`).
+- **Generic remediation.** Remediation steps can be generic and are not tailored to a specific endpoint management tool yet.
+
+## Roadmap (v2 ideas)
+
+- Ground the AI with official NVD data so fixed versions come from source data
+- Device-level remediation tracking
+- Spreadsheet upload for scan exports
+- Saved history and user accounts
+- Tune remediation steps for enterprise deployment tools
+
+See the open GitHub issue for the planned v2 improvement: [ISSUE_LINK_HERE].
+
+## Project documents
+
+- [docs/](docs/): product requirements document (PRD)
+- [spec.md](spec.md): specification (with revision log)
+- [architecture.md](architecture.md): architecture notes
+- [CLAUDE.md](CLAUDE.md) and [.cursorrules](.cursorrules): instructions for AI coding assistants
+- [REFLECTION_LINK_HERE]: one-page reflection
+
+## AI-assisted development
+
+This project was planned and built with AI assistance (Claude). The PRD, spec, and assistant instruction files were written first, and the code was built in small, tested commits that the author reviewed and ran.
