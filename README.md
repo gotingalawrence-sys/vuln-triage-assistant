@@ -4,8 +4,8 @@
 
 An AI-powered web app that turns a vulnerability title or CVE ID into a structured, workflow-ready analysis in seconds: a plain-language explanation, an executive summary, a risk assessment, remediation steps, and text ready to paste into a ServiceNow ticket.
 
-- **Live app:** https://vuln-triage-assistant.vercel.app/
-- **2-minute demo:** [DEMO_LINK_HERE]
+- **Live app:** https://vuln-triage-assistant.vercel.app/- 
+- **2-minute demo:** https://drive.google.com/file/d/1mm0qu1ikAE7CnpfXqk-HDF6Pcf02LFLz/view?usp=sharing
 - **Author:** Lawrence Godfrey Gotinga
 - **Context:** Week 4 Graded Assignment 4.2, AI-Powered Web Application
 
