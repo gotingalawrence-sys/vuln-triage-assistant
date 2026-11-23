@@ -167,7 +167,7 @@ See the open GitHub issue for the planned v2 improvement: https://github.com/got
 - [spec.md](spec.md): specification (with revision log)
 - [architecture.md](architecture.md): architecture notes
 - [CLAUDE.md](CLAUDE.md) and [.cursorrules](.cursorrules): instructions for AI coding assistants
-- [REFLECTION_LINK_HERE]: one-page reflection
+- [REFLECTION_LINK_HERE]: - [reflection.pdf](reflection.pdf): one-page reflection
 
 ## AI-assisted development
 
